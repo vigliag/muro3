@@ -8,61 +8,62 @@ class window.muro3.Game
       @colWidth = Math.floor(@config.width/13)
       remainder = @config.width%13
       @leftMargin = Math.floor(remainder/2)
-      
+
       @scaleInfo =
         ratio: 1
-        currentWidth: 0
-        currentHeight: 0
-      
+        currentWidth: @config.width
+        currentHeight: @config.height
+
       @ladderPositions = [2,5,7,9]
-      
+
       @scoreDisplay = new createjs.Text("", "bold 17px Arial", "#000000")
       @scoreDisplay.x = 20
       @scoreDisplay.y = 3
-      @stage.addChild(@scoreDisplay);
-      
-      @scaleDisplay()
-      window.addEventListener("resize", @scaleDisplay, false)
-      
+
+
+      #@scaleDisplay()
+      #window.addEventListener("resize", @scaleDisplay, false)
+
       #key mapping
       @shoot = false
       @moveLeft = false
       @moveRight = false
-      
+
+
       createjs.Ticker.useRAF = true
       createjs.Ticker.setFPS(@config.fps)
-      
-  scaleDisplay: => 
+
+  scaleDisplay: =>
         @scaleInfo.currentWidth = window.innerWidth
         @scaleInfo.currentHeight = @scaleInfo.currentWidth * (@config.height/@config.width)
-        
+
         if @scaleInfo.currentHeight > window.innerHeight
           @scaleInfo.currentHeight = window.innerHeight
           @scaleInfo.currentWidth = @scaleInfo.currentHeight * (@config.width/@config.height)
-        
+
         @canvas.style.width = @scaleInfo.currentWidth + 'px'
         @canvas.style.height = @scaleInfo.currentHeight + 'px'
 
-  getXPos : (position) -> 
+  getXPos : (position) ->
         @leftMargin + (position * @colWidth)
-  
-  gameOver : => 
-        alert("Game Over. Hai fatto " + @score + " punti")
+
+  gameOver : =>
+        alert("Game Over. You scored " + @score + " points")
         @init()
-  
+
   drawScore: =>
-    @scoreDisplay.text = "Punteggio: " + @score;
-  
-  touchToAction: ( touch ) => 
+    @scoreDisplay.text = "Score: " + @score;
+
+  touchToAction: ( evt ) =>
     middleX = @scaleInfo.currentWidth/2
     middleY = @scaleInfo.currentHeight/2
 
-    if ( touch.pageY < middleY )
+    if ( evt.stageY > middleY )
       @moveLeft=false;
       @moveRight=false;
       @shoot = true;
     else
-      if( touch.pageX > middleX )
+      if( evt.stageX > middleX )
         @shoot = false;
         @moveLeft = false;
         @moveRight = true;
@@ -70,9 +71,9 @@ class window.muro3.Game
         @shoot = false;
         @moveRight = false;
         @moveLeft = true;
-    
+
     return false;
-  
+
   keyToAction: (e) =>
     switch e.keyCode
       when 37 #left arrow
@@ -81,20 +82,25 @@ class window.muro3.Game
       when 39 #right arrow
         @moveRight = true;
         @moveLeft = false;
+      when 40
+        @shoot = true;
       when 32 #space
         @shoot = true;
       when 80 #p
-        createjs.Ticker.setPaused(!createjs.Ticker.getPaused());
-      
+        createjs.Ticker.paused = !(createjs.Ticker.paused);
+
     return false
-    
-  gameTick: (delta, current)=>
-    
+
+  gameTick: (evt)=>
+
+    if evt.paused
+      return
+
     if @player.position == 0 or @player.position == 12
       @player.charge()
       @shoot = false
 
-    if @moveRight and @player.position < 12 
+    if @moveRight and @player.position < 12
       @player.position +=1
       @moveRight = false
 
@@ -107,7 +113,7 @@ class window.muro3.Game
       nstone = new window.muro3.Stone(@player.position, @stage, @assets)
       @stones.push nstone
       nstone.drawing.x = @getXPos(nstone.position)+20;
-      
+
       @shoot = false
 
     if Math.random()<0.02
@@ -116,18 +122,18 @@ class window.muro3.Game
     @player.update()
     @player.drawing.y = 34;
     @player.drawing.x = @getXPos(@player.position);
-    
+
     #aggiorno tutti gli zombie
-    for zombie in @zombies 
+    for zombie in @zombies
       zombie.update()
-      if zombie.drawing.y < 100 
+      if zombie.drawing.y < 100
         @gameOver()
-  
-    for stone in @stones 
+
+    for stone in @stones
       stone.update()
-      if stone.drawing.y > 600 
+      if stone.drawing.y > 600
         stone.toRemove = true
-     
+
       for zombie in @zombies
         if stone.position == zombie.position and ( stone.drawing.y - zombie.drawing.y ) > 0
           zombie.toRemove = true
@@ -140,13 +146,13 @@ class window.muro3.Game
         @stage.removeChild(stone.drawing)
       else
         newStones.push(stone)
-    
+
     newZombies = []
     for zombie in @zombies
       if zombie.toRemove
         @stage.removeChild(zombie.drawing)
       else
-        newZombies.push(zombie) 
+        newZombies.push(zombie)
 
     @stones = newStones
     @zombies = newZombies
@@ -154,7 +160,7 @@ class window.muro3.Game
     #disegno
     @drawScore(@score)
     @stage.update()
-  
+
   addZombie : =>
           position = @ladderPositions[ Math.floor( ( Math.random() * @ladderPositions.length) ) ]
           newzombie = new window.muro3.Zombie(position, @stage, @assets)
@@ -172,38 +178,40 @@ class window.muro3.Game
 
         #Disegno lo sfondo
         @stage.addChild(new createjs.Bitmap(@assets.bg))
-        
+
+        @stage.addChild(@scoreDisplay);
+
         #Aggiungo (e disegno) il giocatore
         @player = new window.muro3.Player(@stage, @assets)
         @player.addToStage()
-        
+
         addLadder = (position)=>
           newLadder = @stage.addChild(new createjs.Bitmap(@assets.ladder))
           newLadder.x = @getXPos(position)
           newLadder.y = 110
-        
-        
+
+
         #Disegno le scale
         addLadder position for position in @ladderPositions
-      
-        document.onkeydown = @keyToAction;
-        
-        preventDefault = (e)=> 
-          e.preventDefault()
-        
-        window.addEventListener('touchmove', preventDefault)
-        window.addEventListener('touchend', preventDefault)
 
-        window.addEventListener 'click', (e)=>
-            e.preventDefault();
+        document.onkeydown = @keyToAction;
+
+        preventDefault = (e)=>
+          e.preventDefault()
+
+        #window.addEventListener('touchmove', preventDefault)
+        #window.addEventListener('touchend', preventDefault)
+
+        @stage.on 'stagemousedown', (e)=>
+            #e.preventDefault();
             @touchToAction(e);
-            return false;
-         
-        window.addEventListener 'touchstart', (e)=>
-          e.preventDefault();
-          @touchToAction(e.touches[0]);
-          return false;
-        
+            #return false;
+
+        #window.addEventListener 'touchstart', (e)=>
+        #  e.preventDefault();
+        #  @touchToAction(e.touches[0]);
+        #  return false;
+
         #avvio il ciclo principale
-        createjs.Ticker.removeAllListeners()
-        createjs.Ticker.addListener(@gameTick)
+        createjs.Ticker.removeAllEventListeners()
+        createjs.Ticker.addEventListener('tick', @gameTick)
